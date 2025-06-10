@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: escom_bda_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./scripts:/scripts
+    command: redis-server --appendonly yes
+    networks:
+      - redis_network
+    restart: unless-stopped
+
+  web_app:
+    build: ./app
+    container_name: escom_bda_app
+    ports:
+      - "5000:5000"
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./scripts:/scripts
+    networks:
+      - redis_network
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+
+networks:
+  redis_network:
+    driver: bridge

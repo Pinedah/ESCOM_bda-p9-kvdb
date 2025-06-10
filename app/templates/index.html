@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Sesiones Redis - ESCOM BDA</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="email"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .danger {
+            background-color: #dc3545;
+        }
+        .danger:hover {
+            background-color: #c82333;
+        }
+        .success {
+            background-color: #28a745;
+        }
+        .flash-messages {
+            margin-bottom: 20px;
+        }
+        .flash {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+        .flash.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .flash.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .flash.warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .flash.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .stat-card {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .sessions-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        .session-item {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            color: #007bff;
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔑 Sistema de Gestión de Sesiones Redis</h1>
+        <p>Práctica 9: Bases de Datos Clave-Valor - ESCOM</p>
+    </div>
+
+    <!-- Mensajes Flash -->
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Formulario para crear sesión -->
+    <div class="container">
+        <h2>📝 Crear Nueva Sesión</h2>
+        <form method="POST" action="/crear_sesion">
+            <div class="form-group">
+                <label for="user_id">ID de Usuario:</label>
+                <input type="text" id="user_id" name="user_id" required 
+                       placeholder="ej: user_001">
+            </div>
+            <div class="form-group">
+                <label for="username">Nombre de Usuario:</label>
+                <input type="text" id="username" name="username" required 
+                       placeholder="ej: juan_perez">
+            </div>
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required 
+                       placeholder="ej: juan@ejemplo.com">
+            </div>
+            <button type="submit">Crear Sesión</button>
+        </form>
+    </div>
+
+    <!-- Formulario para obtener/cerrar sesión -->
+    <div class="container">
+        <h2>🔍 Gestionar Sesión Existente</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div>
+                <h3>Obtener Información</h3>
+                <form method="POST" action="/obtener_sesion">
+                    <div class="form-group">
+                        <label for="session_token_get">Token de Sesión:</label>
+                        <input type="text" id="session_token_get" name="session_token" required 
+                               placeholder="Token UUID">
+                    </div>
+                    <button type="submit">Obtener Sesión</button>
+                </form>
+            </div>
+            <div>
+                <h3>Cerrar Sesión</h3>
+                <form method="POST" action="/cerrar_sesion">
+                    <div class="form-group">
+                        <label for="session_token_close">Token de Sesión:</label>
+                        <input type="text" id="session_token_close" name="session_token" required 
+                               placeholder="Token UUID">
+                    </div>
+                    <button type="submit" class="danger">Cerrar Sesión</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estadísticas y monitoring -->
+    <div class="container">
+        <h2>📊 Estadísticas en Tiempo Real</h2>
+        <button onclick="actualizarEstadisticas()">🔄 Actualizar Estadísticas</button>
+        <button onclick="actualizarSesiones()">📋 Listar Sesiones Activas</button>
+        <form method="POST" action="/limpiar_expiradas" style="display: inline;">
+            <button type="submit" class="success">🧹 Limpiar Expiradas</button>
+        </form>
+        
+        <div class="stats-grid" id="estadisticas">
+            <!-- Las estadísticas se cargarán aquí -->
+        </div>
+
+        <div id="sesiones-activas">
+            <!-- Las sesiones activas se cargarán aquí -->
+        </div>
+    </div>
+
+    <script>
+        // Función para actualizar estadísticas
+        async function actualizarEstadisticas() {
+            try {
+                const response = await fetch('/api/estadisticas');
+                const stats = await response.json();
+                
+                const statsContainer = document.getElementById('estadisticas');
+                statsContainer.innerHTML = `
+                    <div class="stat-card">
+                        <h3>🟢 Sesiones Activas</h3>
+                        <p style="font-size: 2em; margin: 0;">${stats.sesiones_activas}</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>👥 Usuarios en Ranking</h3>
+                        <p style="font-size: 2em; margin: 0;">${stats.usuarios_en_ranking}</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>⏰ Última Actualización</h3>
+                        <p style="margin: 0;">${new Date().toLocaleString()}</p>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error al obtener estadísticas:', error);
+            }
+        }
+
+        // Función para actualizar lista de sesiones
+        async function actualizarSesiones() {
+            try {
+                const response = await fetch('/api/sesiones_activas');
+                const sesiones = await response.json();
+                
+                const sesionesContainer = document.getElementById('sesiones-activas');
+                
+                if (sesiones.length === 0) {
+                    sesionesContainer.innerHTML = '<p>No hay sesiones activas.</p>';
+                    return;
+                }
+                
+                let html = '<h3>📋 Sesiones Activas:</h3><div class="sessions-list">';
+                sesiones.forEach(sesion => {
+                    html += `
+                        <div class="session-item">
+                            <strong>Usuario:</strong> ${sesion.username} (${sesion.user_id})<br>
+                            <strong>Email:</strong> ${sesion.email}<br>
+                            <strong>Token:</strong> ${sesion.token}<br>
+                            <strong>Creada:</strong> ${new Date(sesion.created_at).toLocaleString()}<br>
+                            <strong>Última actividad:</strong> ${new Date(sesion.last_activity).toLocaleString()}<br>
+                            <strong>TTL:</strong> ${sesion.ttl > 0 ? sesion.ttl + ' segundos' : 'Sin expiración'}
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                sesionesContainer.innerHTML = html;
+                
+            } catch (error) {
+                console.error('Error al obtener sesiones:', error);
+            }
+        }
+
+        // Actualizar estadísticas al cargar la página
+        document.addEventListener('DOMContentLoaded', function() {
+            actualizarEstadisticas();
+        });
+
+        // Auto-actualizar cada 30 segundos
+        setInterval(actualizarEstadisticas, 30000);
+    </script>
+</body>
+</html>

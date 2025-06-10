@@ -14,6 +14,19 @@ services:
       - redis_network
     restart: unless-stopped
 
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: escom_bda_redis_commander
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    depends_on:
+      - redis
+    networks:
+      - redis_network
+    restart: unless-stopped
+
   web_app:
     build: ./app
     container_name: escom_bda_app
